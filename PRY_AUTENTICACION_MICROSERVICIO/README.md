@@ -1,59 +1,235 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+PRY_AUTENTICACION_MICROSERVICIO — README
+1. Resumen
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Microservicio de Autenticación construido con Laravel 12.
+Provee registro (opcional), login y validación de tokens con Laravel Sanctum. Se conecta a MySQL y expone un endpoint para que otros microservicios validen tokens:
 
-## About Laravel
+POST /api/register (opcional)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+POST /api/login
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+GET /api/validate-token (protegido por auth:sanctum)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+2. Requisitos
 
-## Learning Laravel
+PHP 8.2+ (según requerimiento de Laravel 12)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+Composer
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+MySQL (XAMPP, MariaDB o servidor remoto)
 
-## Laravel Sponsors
+Git
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+(Opcional) Docker / docker-compose
 
-### Premium Partners
+Postman o similar para pruebas
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+3. Estructura del repositorio
+PRY_AUTENTICACION_MICROSERVICIO/
+├─ app/
+│  └─ Http/Controllers/AuthController.php
+├─ app/Models/User.php
+├─ routes/
+│  └─ api.php
+├─ database/
+│  └─ migrations/
+├─ .env
+├─ composer.json
+└─ README.md
 
-## Contributing
+4. Instalación (local)
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Desde la carpeta donde quieras clonar:
 
-## Code of Conduct
+git clone <TU_REPO_URL> PRY_AUTENTICACION_MICROSERVICIO
+cd PRY_AUTENTICACION_MICROSERVICIO
+composer install
+cp .env.example .env
+php artisan key:generate
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+5. Configurar .env (MySQL)
 
-## Security Vulnerabilities
+Edita .env con los datos de tu MySQL (XAMPP por ejemplo):
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+APP_NAME=AuthService
+APP_ENV=local
+APP_KEY=base64:...
+APP_DEBUG=true
+APP_URL=http://localhost:8000
 
-## License
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=auth_db
+DB_USERNAME=tu_usuario_mysql
+DB_PASSWORD=tu_contraseña_mysql
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+LOG_CHANNEL=stack
+LOG_LEVEL=debug
+
+
+IMPORTANTE: si usas XAMPP asegúrate que MySQL esté iniciado y que la base auth_db exista. Puedes crearla con:
+
+CREATE DATABASE auth_db;
+
+
+(o desde phpMyAdmin).
+
+6. Instalación y configuración de Sanctum
+
+Si no se instaló aún:
+
+composer require laravel/sanctum
+php artisan vendor:publish --provider="Laravel\Sanctum\SanctumServiceProvider"
+php artisan migrate
+
+
+php artisan migrate debe crear las tablas users y personal_access_tokens (además de otras migraciones que tengas).
+
+7. Modelo User
+
+El app/Models/User.php debe usar el trait HasApiTokens:
+
+use Laravel\Sanctum\HasApiTokens;
+
+class User extends Authenticatable
+{
+    use HasApiTokens, HasFactory, Notifiable;
+    ...
+}
+
+
+Esto permite emitir tokens con $user->createToken(...)->plainTextToken.
+
+8. Controlador y rutas clave
+
+app/Http/Controllers/AuthController.php (resumen)
+
+register(Request $r) — validar y crear usuario (opcional).
+
+login(Request $r) — validar credenciales y emitir token.
+
+validateToken(Request $r) — devuelve valid: true y user (protegido por auth:sanctum).
+
+Rutas (routes/api.php):
+
+Route::post('/register',[AuthController::class,'register']); // opcional
+Route::post('/login',[AuthController::class,'login']);
+Route::middleware('auth:sanctum')->get('/validate-token',[AuthController::class,'validateToken']);
+
+9. Comandos importantes
+
+Migraciones:
+
+php artisan migrate
+
+
+Limpiar caché de config (si Laravel no lee .env):
+
+php artisan config:clear
+php artisan cache:clear
+php artisan optimize:clear
+
+
+Verificar driver DB en tinker:
+
+php artisan tinker
+>>> DB::connection()->getDriverName(); // debe devolver "mysql"
+
+10. Cómo ejecutar (desarrollo)
+
+Opción A — php artisan serve (recomendado para desarrollo rápido):
+
+php artisan serve --host=127.0.0.1 --port=8000
+# servicio disponible en http://127.0.0.1:8000
+
+
+Opción B — servir con Apache (XAMPP):
+
+Coloca el proyecto dentro de htdocs (o crea Virtual Host).
+
+Asegúrate de que public/ sea accesible desde Apache.
+
+Reinicia Apache si es necesario.
+
+11. Pruebas en Postman (ejemplos)
+
+Registro (opcional)
+
+POST http://127.0.0.1:8000/api/register
+Body (JSON):
+{
+  "name": "Juan Perez",
+  "email": "juan@example.com",
+  "password": "123456"
+}
+
+
+Login
+
+POST http://127.0.0.1:8000/api/login
+Body (JSON):
+{
+  "email": "juan@example.com",
+  "password": "123456"
+}
+
+
+Respuesta:
+
+{
+  "message": "Login correcto",
+  "token_type": "Bearer",
+  "token": "eyJ..."
+}
+
+
+Validar token
+
+GET http://127.0.0.1:8000/api/validate-token
+Header: Authorization: Bearer <TOKEN_AQUI>
+
+
+Respuesta esperada:
+
+{ "valid": true, "user": { "id":1, "name":"Juan Perez", "email":"juan@example.com" } }
+
+
+12. Git y entrega
+
+Ejemplo mínimo:
+
+git init
+git add .
+git commit -m "Auth microservice: initial"
+git branch -M main
+git remote add origin git@github.com:TU_USUARIO/PRY_AUTENTICACION_MICROSERVICIO.git
+git push -u origin main
+
+
+Incluye en el repo:
+
+Código fuente
+
+.env.example (sin credenciales reales)
+
+postman_collection.json (opcional)
+
+README.md (este archivo)
+
+13. Archivos útiles (ejemplo .env.example)
+APP_NAME=AuthService
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_URL=http://localhost:8000
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=auth_db
+DB_USERNAME=root
+DB_PASSWORD=
+
+LOG_CHANNEL=stack
+LOG_LEVEL=debug
